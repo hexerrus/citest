@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo "i'm testsh!"
+echo "i'm testsh! #1"
