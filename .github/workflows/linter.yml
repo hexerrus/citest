@@ -1,0 +1,19 @@
+# .github/workflows/linter.yml
+name: Linter
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  linter:
+    name: Linter check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run linter
+        run: ./scripts/lint.sh
