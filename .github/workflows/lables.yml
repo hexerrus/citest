@@ -1,0 +1,133 @@
+name: PR approval policy
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  pull-requests: read
+  issues: write
+  contents: read
+
+jobs:
+  policy:
+    name: PR approval policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Label PR and enforce approval policy
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const pr =
+              context.payload.pull_request ||
+              context.payload.review?.pull_request;
+
+            if (!pr) {
+              core.info("No PR found in event payload.");
+              return;
+            }
+
+            const pull_number = pr.number;
+
+            const excludedFolders = [
+              "Sfm.Core.Infrastructure.Tests/",
+              "Sfm.Core.Services.IntegrationTests/",
+              "Sfm.Core.Shared.Tests/",
+              "Sfm.Selenium.Tests/",
+            ];
+
+            const CODE_REVIEW = "code_review";
+            const SCISSORS = "scissors";
+
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number, per_page: 100 }
+            );
+
+            const changedFilesCount = files.length;
+            const totalChanges = files.reduce(
+              (sum, f) => sum + f.additions + f.deletions,
+              0
+            );
+
+            const onlyExcludedFolders =
+              files.length > 0 &&
+              files.every(f =>
+                excludedFolders.some(folder => f.filename.startsWith(folder))
+              );
+
+            const needCodeReview =
+              !onlyExcludedFolders && totalChanges >= 25;
+
+            const needScissors =
+              !onlyExcludedFolders && changedFilesCount > 60;
+
+            async function addLabel(label) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pull_number,
+                labels: [label],
+              });
+            }
+
+            async function removeLabel(label) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number: pull_number,
+                  name: label,
+                });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+              }
+            }
+
+            if (needCodeReview) await addLabel(CODE_REVIEW);
+            else await removeLabel(CODE_REVIEW);
+
+            if (needScissors) await addLabel(SCISSORS);
+            else await removeLabel(SCISSORS);
+
+            const reviews = await github.paginate(
+              github.rest.pulls.listReviews,
+              { owner, repo, pull_number, per_page: 100 }
+            );
+
+            const latestReviewByUser = new Map();
+
+            for (const review of reviews) {
+              latestReviewByUser.set(review.user.login, review.state);
+            }
+
+            const approvals = [...latestReviewByUser.values()]
+              .filter(state => state === "APPROVED")
+              .length;
+
+            core.info(`Files changed: ${changedFilesCount}`);
+            core.info(`Total changes: ${totalChanges}`);
+            core.info(`Only excluded folders: ${onlyExcludedFolders}`);
+            core.info(`Approvals: ${approvals}`);
+            core.info(`Need code_review: ${needCodeReview}`);
+            core.info(`Need scissors: ${needScissors}`);
+
+            const failures = [];
+
+            if (needCodeReview && approvals < 1) {
+              failures.push(`PR has "${CODE_REVIEW}" policy and needs at least 1 approval.`);
+            }
+
+            if (needScissors && approvals < 2) {
+              failures.push(`PR has "${SCISSORS}" policy and needs at least 2 approvals.`);
+            }
+
+            if (failures.length > 0) {
+              core.setFailed(failures.join("\n"));
+            }
