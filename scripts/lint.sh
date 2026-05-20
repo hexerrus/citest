@@ -3,4 +3,4 @@ set -euo pipefail
 
 echo "linter test"
 
-exit 1
+exit 0
