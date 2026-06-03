@@ -134,9 +134,9 @@ jobs:
               failures.push(`PR has "${SCISSORS}" policy and needs at least 2 approvals.`);
             }
 
-            # if (failures.length > 0) {
-            #   core.setFailed(failures.join("\n"));
-            # }
+            // if (failures.length > 0) {
+            //   core.setFailed(failures.join("\n"));
+            // }
 
             const sha = pr.head.sha;
             const contextName = "PR approvals satisfied";
