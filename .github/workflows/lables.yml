@@ -10,10 +10,12 @@ on:
     types: [submitted, dismissed]
 
 
+
 permissions:
   contents: read
   issues: write
   pull-requests: write
+  statuses: write
 
 jobs:
   policy:
@@ -132,6 +134,31 @@ jobs:
               failures.push(`PR has "${SCISSORS}" policy and needs at least 2 approvals.`);
             }
 
+            // if (failures.length > 0) {
+            //   core.setFailed(failures.join("\n"));
+            // }
+
+            const sha = pr.head.sha;
+            const contextName = "PR approvals satisfied";
+            
             if (failures.length > 0) {
-              core.setFailed(failures.join("\n"));
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: "pending",
+                context: contextName,
+                description: failures[0].slice(0, 140),
+              });
+            
+              core.info(failures.join("\n"));
+            } else {
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha,
+                state: "success",
+                context: contextName,
+                description: "PR approval policy satisfied",
+              });
             }
