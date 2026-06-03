@@ -6,8 +6,8 @@ on:
       - main
       - master
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
-  pull_request_review:
-    types: [submitted, dismissed]
+//  pull_request_review:
+//    types: [submitted, dismissed]
 
 
 
